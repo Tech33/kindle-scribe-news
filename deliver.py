@@ -6,10 +6,7 @@ Fetches newspapers via Calibre recipes and delivers them to your Kindle Scribe.
 
 import argparse
 from datetime import datetime
-from email import encoders
-from email.mime.base import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from email.message import EmailMessage
 import os
 from pathlib import Path
 import smtplib
@@ -95,7 +92,7 @@ def send_to_kindle(
     smtp_host: str = "smtp.gmail.com",
     smtp_port: int = 587
 ) -> bool:
-    """Sends an EPUB to Amazon Send-to-Kindle via SMTP."""
+    """Sends an EPUB to Amazon Send-to-Kindle using standard RFC email structure."""
     if not epub_path.exists():
         print(f"[-] File not found: {epub_path}")
         return False
@@ -103,23 +100,25 @@ def send_to_kindle(
     print(f"\n[+] Sending '{paper_name}' ({epub_path.name}) to Kindle: {kindle_email}...")
     print(f"    From: {smtp_user} via {smtp_host}:{smtp_port}")
     
-    msg = MIMEMultipart()
+    # Use modern EmailMessage with 'Convert' subject which Amazon's document service expects
+    msg = EmailMessage()
     msg['From'] = smtp_user
     msg['To'] = kindle_email
-    msg['Subject'] = f"{paper_name} - {datetime.now().strftime('%d %b %Y')}"
+    msg['Subject'] = f"Convert: {paper_name} - {datetime.now().strftime('%d %b %Y')}"
+    msg.set_content(
+        f"Daily delivery of {paper_name} for Kindle Scribe.\n"
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+        f"File: {epub_path.name}"
+    )
 
-    body = f"Daily delivery of {paper_name} for Kindle Scribe.\nDelivered on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
-    msg.attach(MIMEText(body, 'plain'))
-
-    with open(epub_path, 'rb') as attachment:
-        part = MIMEBase('application', 'epub+zip')
-        part.set_payload(attachment.read())
-        encoders.encode_base64(part)
-        part.add_header(
-            'Content-Disposition',
-            f'attachment; filename="{epub_path.name}"'
+    with open(epub_path, 'rb') as f:
+        file_data = f.read()
+        msg.add_attachment(
+            file_data,
+            maintype='application',
+            subtype='epub+zip',
+            filename=epub_path.name
         )
-        msg.attach(part)
 
     try:
         if smtp_port == 465:
@@ -133,7 +132,7 @@ def send_to_kindle(
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
-        print(f"[✓] Successfully emailed {epub_path.name} to {kindle_email}!")
+        print(f"[✓] Successfully emailed {epub_path.name} to {kindle_email} via Gmail SMTP!")
         return True
     except Exception as e:
         print(f"[-] Failed to send email to Kindle: {e}")
