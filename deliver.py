@@ -164,6 +164,40 @@ def main():
     today_str = datetime.now().strftime('%Y-%m-%d')
     targets = list(NEWSPAPERS.keys()) if args.paper == 'all' else [args.paper]
 
+    # Debug secret inspection (masks sensitive characters)
+    def mask_str(s: str, show_start: int = 3, show_end: int = 3) -> str:
+        if not s:
+            return "<EMPTY / NOT SET>"
+        s = s.strip()
+        if len(s) <= (show_start + show_end):
+            return f"[{len(s)} chars, set]"
+        return f"{s[:show_start]}...{s[-show_end:]} ({len(s)} chars)"
+
+    print("==========================================")
+    print("🔍 SECRETS & CONFIGURATION DIAGNOSTICS")
+    print("==========================================")
+    print(f"• KINDLE_EMAIL : {mask_str(args.kindle_email, 4, 11)}")
+    print(f"• SMTP_USER    : {mask_str(args.smtp_user, 4, 10)}")
+    print(f"• SMTP_PASS    : {mask_str(args.smtp_pass, 2, 2)}")
+    print(f"• SMTP_HOST    : {args.smtp_host}:{args.smtp_port}")
+    
+    # Specific format validations to catch common configuration mistakes
+    if args.kindle_email:
+        k_clean = args.kindle_email.strip()
+        if not (k_clean.endswith('@kindle.com') or k_clean.endswith('@free.kindle.com')):
+            print(f"  ⚠️ Warning: KINDLE_EMAIL does not end with '@kindle.com' (ends with: {k_clean.split('@')[-1] if '@' in k_clean else 'no @'})")
+        if ' ' in k_clean:
+            print("  ⚠️ Warning: KINDLE_EMAIL contains extra spaces!")
+    
+    if args.smtp_pass:
+        p_clean = args.smtp_pass.strip().replace(' ', '')
+        if len(p_clean) == 16:
+            print("  ✓ SMTP_PASS looks like a valid 16-character Google App Password.")
+        else:
+            print(f"  ℹ️ SMTP_PASS length is {len(p_clean)} characters (Google App Passwords are normally 16 characters).")
+            
+    print("==========================================\n")
+
     if not args.no_send:
         if not args.kindle_email:
             print("[-] Error: KINDLE_EMAIL is missing in GitHub Secrets or environment.")
