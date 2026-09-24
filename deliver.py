@@ -27,52 +27,63 @@ NEWSPAPERS = {
     'toi': {
         'name': 'The Times of India',
         'recipe': 'recipes/times_of_india.recipe',
+        'builtin': 'toi',
         'slug': 'Times_of_India'
     },
     'irishtimes': {
         'name': 'The Irish Times',
         'recipe': 'recipes/irish_times.recipe',
+        'builtin': 'irish_times',
         'slug': 'Irish_Times'
     },
     'independent': {
         'name': 'Irish Independent',
         'recipe': 'recipes/irish_independent.recipe',
+        'builtin': 'irish_independent',
         'slug': 'Irish_Independent'
     }
 }
 
 
-def build_epub(recipe_path: Path, output_epub: Path) -> bool:
+def build_epub(recipe_path: Path, output_epub: Path, builtin_id: str = None) -> bool:
     """Builds an EPUB file using Calibre's ebook-convert."""
     output_epub.parent.mkdir(parents=True, exist_ok=True)
     
-    if not recipe_path.exists():
-        print(f"[-] Error: Recipe not found at {recipe_path}")
-        return False
-
-    print(f"\n[+] Compiling {recipe_path.name} -> {output_epub.name}...")
     cmd = [
         "ebook-convert",
         str(recipe_path),
         str(output_epub),
-        "--output-profile", "kindle",
-        "--dont-compress"
+        "--output-profile", "kindle"
     ]
 
-    try:
-        process = subprocess.run(cmd, check=True, text=True, capture_output=True)
-        print(f"[✓] Successfully generated {output_epub} ({output_epub.stat().st_size // 1024} KB)")
+    print(f"\n[+] Compiling {recipe_path.name} -> {output_epub.name}...")
+    print(f"    Executing: {' '.join(cmd)}")
+    
+    # Stream output directly to console so GitHub Actions shows full progress
+    res = subprocess.run(cmd)
+    
+    if res.returncode == 0 and output_epub.exists() and output_epub.stat().st_size > 0:
+        size_kb = output_epub.stat().st_size // 1024
+        print(f"[✓] Successfully generated {output_epub.name} ({size_kb} KB)")
         return True
-    except FileNotFoundError:
-        print("[-] Error: 'ebook-convert' not found.")
-        print("    Calibre is required to compile recipes.")
-        print("    - On Mac: brew install --cask calibre")
-        print("    - On GitHub Actions: Ubuntu runner installs Calibre automatically.")
-        return False
-    except subprocess.CalledProcessError as e:
-        print(f"[-] Error compiling {recipe_path.name}:")
-        print(e.stderr or e.stdout)
-        return False
+
+    # Fallback to Calibre's builtin recipe if available
+    if builtin_id:
+        print(f"[!] Recipe file had an issue. Retrying with Calibre built-in: 'builtin:{builtin_id}'...")
+        fallback_cmd = [
+            "ebook-convert",
+            f"builtin:{builtin_id}",
+            str(output_epub),
+            "--output-profile", "kindle"
+        ]
+        res2 = subprocess.run(fallback_cmd)
+        if res2.returncode == 0 and output_epub.exists() and output_epub.stat().st_size > 0:
+            size_kb = output_epub.stat().st_size // 1024
+            print(f"[✓] Successfully generated {output_epub.name} via builtin:{builtin_id} ({size_kb} KB)")
+            return True
+
+    print(f"[-] Error: Failed to generate {output_epub.name}")
+    return False
 
 
 def send_to_kindle(
@@ -89,7 +100,8 @@ def send_to_kindle(
         print(f"[-] File not found: {epub_path}")
         return False
 
-    print(f"\n[+] Sending '{paper_name}' to Kindle: {kindle_email}...")
+    print(f"\n[+] Sending '{paper_name}' ({epub_path.name}) to Kindle: {kindle_email}...")
+    print(f"    From: {smtp_user} via {smtp_host}:{smtp_port}")
     
     msg = MIMEMultipart()
     msg['From'] = smtp_user
@@ -111,10 +123,12 @@ def send_to_kindle(
 
     try:
         if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+            server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=45)
         else:
-            server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+            server = smtplib.SMTP(smtp_host, smtp_port, timeout=45)
+            server.ehlo()
             server.starttls()
+            server.ehlo()
             
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
@@ -149,16 +163,14 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     today_str = datetime.now().strftime('%Y-%m-%d')
-    targets = NEWSPAPERS.keys() if args.paper == 'all' else [args.paper]
+    targets = list(NEWSPAPERS.keys()) if args.paper == 'all' else [args.paper]
 
     if not args.no_send:
         if not args.kindle_email:
-            print("[-] Error: Kindle email is missing.")
-            print("    Provide --kindle-email or set KINDLE_EMAIL environment variable.")
+            print("[-] Error: KINDLE_EMAIL is missing in GitHub Secrets or environment.")
             sys.exit(1)
         if not args.smtp_user or not args.smtp_pass:
-            print("[-] Error: SMTP credentials missing.")
-            print("    Set SMTP_USER and SMTP_PASS environment variables (or use --no-send to test compilation only).")
+            print("[-] Error: SMTP_USER or SMTP_PASS is missing in GitHub Secrets or environment.")
             sys.exit(1)
 
     success_count = 0
@@ -170,7 +182,7 @@ def main():
         epub_filename = f"{info['slug']}_{today_str}.epub"
         epub_path = output_dir / epub_filename
 
-        build_ok = build_epub(recipe_path, epub_path)
+        build_ok = build_epub(recipe_path, epub_path, builtin_id=info.get('builtin'))
         if not build_ok:
             continue
 
@@ -189,7 +201,13 @@ def main():
         else:
             success_count += 1
 
-    print(f"\n[+] Finished: {success_count}/{total} newspapers processed successfully.")
+    print(f"\n==========================================")
+    print(f"Summary: {success_count}/{total} newspapers processed successfully.")
+    print(f"==========================================")
+
+    if success_count == 0:
+        print("[-] Error: None of the requested newspapers were successfully built or sent.")
+        sys.exit(1)
 
 
 if __name__ == '__main__':
