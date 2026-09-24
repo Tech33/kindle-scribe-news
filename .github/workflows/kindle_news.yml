@@ -1,0 +1,63 @@
+name: Daily & On-Demand Kindle News Delivery
+
+on:
+  schedule:
+    # Runs at 05:30 UTC every morning (approx 06:30 AM Ireland / 11:00 AM IST)
+    # Adjust cron as desired: 'minute hour * * *' in UTC
+    - cron: '30 5 * * *'
+
+  workflow_dispatch:
+    inputs:
+      paper:
+        description: 'Choose newspaper(s) to compile and deliver'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'toi'
+          - 'irishtimes'
+          - 'independent'
+
+jobs:
+  deliver_news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Install Calibre Ebook Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y calibre xvfb
+
+      - name: Fetch News & Deliver to Kindle
+        env:
+          KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+        run: |
+          PAPER_SELECTION="${{ github.event.inputs.paper || 'all' }}"
+          echo "Selected paper: $PAPER_SELECTION"
+          xvfb-run -a python deliver.py --paper "$PAPER_SELECTION"
+
+      - name: Save EPUB Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kindle-editions
+          path: output/*.epub
+          retention-days: 7

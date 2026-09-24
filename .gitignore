@@ -1,0 +1,13 @@
+# Environment variables and secrets
+.env
+
+# Output epubs
+output/
+*.epub
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store

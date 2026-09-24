@@ -1,0 +1,35 @@
+from calibre.web.feeds.news import BasicNewsRecipe
+
+class IrishTimes(BasicNewsRecipe):
+    title = 'The Irish Times'
+    __author__ = 'Kindle Delivery'
+    description = 'Daily edition of The Irish Times'
+    language = 'en_IE'
+    encoding = 'utf-8'
+    oldest_article = 1.5
+    max_articles_per_feed = 20
+    auto_cleanup = True
+    no_stylesheets = True
+    remove_javascript = True
+
+    extra_css = '''
+        h1 { font-size: 1.4em; font-family: sans-serif; margin-bottom: 0.3em; line-height: 1.25; }
+        .byline { font-size: 0.8em; color: #555; margin-bottom: 1em; font-style: italic; }
+        p { font-size: 1em; line-height: 1.5; text-align: justify; margin-bottom: 0.8em; }
+        img { display: block; margin: 0.8em auto; max-width: 100%; }
+        .caption { font-size: 0.8em; color: #666; text-align: center; font-style: italic; }
+    '''
+
+    feeds = [
+        ('Top News', 'https://www.irishtimes.com/arc/outboundfeeds/rss/category/news/'),
+        ('World', 'https://www.irishtimes.com/arc/outboundfeeds/rss/category/news/world/'),
+        ('Business', 'https://www.irishtimes.com/arc/outboundfeeds/rss/category/business/'),
+        ('Opinion', 'https://www.irishtimes.com/arc/outboundfeeds/rss/category/opinion/'),
+        ('Sport', 'https://www.irishtimes.com/arc/outboundfeeds/rss/category/sport/'),
+        ('Culture', 'https://www.irishtimes.com/arc/outboundfeeds/rss/category/culture/')
+    ]
+
+    remove_tags = [
+        dict(name=['script', 'style', 'iframe', 'embed', 'svg', 'header', 'footer']),
+        dict(attrs={'class': ['newsletter-signup', 'subscriber-only-prompt', 'social-share', 'comments', 'advertisement']})
+    ]

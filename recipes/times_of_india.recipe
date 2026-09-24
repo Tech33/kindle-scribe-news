@@ -1,0 +1,36 @@
+from calibre.web.feeds.news import BasicNewsRecipe
+
+class TimesOfIndia(BasicNewsRecipe):
+    title = 'The Times of India'
+    __author__ = 'Kindle Delivery'
+    description = 'Daily morning edition of The Times of India'
+    language = 'en_IN'
+    encoding = 'utf-8'
+    oldest_article = 1.5
+    max_articles_per_feed = 20
+    auto_cleanup = True
+    no_stylesheets = True
+    remove_javascript = True
+
+    extra_css = '''
+        h1 { font-size: 1.4em; font-family: sans-serif; margin-bottom: 0.3em; line-height: 1.25; }
+        .byline { font-size: 0.8em; color: #555; margin-bottom: 1em; font-style: italic; }
+        p { font-size: 1em; line-height: 1.5; text-align: justify; margin-bottom: 0.8em; }
+        img { display: block; margin: 0.8em auto; max-width: 100%; }
+        .caption { font-size: 0.8em; color: #666; text-align: center; font-style: italic; }
+    '''
+
+    feeds = [
+        ('Top Stories', 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms'),
+        ('India News', 'https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms'),
+        ('World News', 'https://timesofindia.indiatimes.com/rssfeeds/296589292.cms'),
+        ('Business', 'https://timesofindia.indiatimes.com/rssfeeds/1898055.cms'),
+        ('Tech', 'https://timesofindia.indiatimes.com/rssfeeds/66949542.cms'),
+        ('Sports', 'https://timesofindia.indiatimes.com/rssfeeds/4719148.cms'),
+        ('Opinion & Editorial', 'https://timesofindia.indiatimes.com/rssfeeds/784865811.cms')
+    ]
+
+    remove_tags = [
+        dict(name=['script', 'style', 'iframe', 'embed', 'svg', 'header', 'footer']),
+        dict(attrs={'class': ['ad-banner', 'social-share', 'comment-box', 'comments-container', 'taboola', 'outbrain', 'ad-slot', 'advertisement']})
+    ]
