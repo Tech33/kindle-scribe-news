@@ -1,11 +1,6 @@
-name: Daily & On-Demand Kindle News Delivery
+name: On-Demand Kindle News Delivery
 
 on:
-  schedule:
-    # Runs at 05:30 UTC every morning (approx 06:30 AM Ireland / 11:00 AM IST)
-    # Adjust cron as desired: 'minute hour * * *' in UTC
-    - cron: '30 5 * * *'
-
   workflow_dispatch:
     inputs:
       paper:
